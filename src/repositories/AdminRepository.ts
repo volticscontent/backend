@@ -14,4 +14,15 @@ export class AdminRepository implements IAdminRepository {
       data,
     });
   }
+
+  async findAllPublic(): Promise<Partial<Admin>[]> {
+    return prisma.admin.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true
+      }
+    });
+  }
 }

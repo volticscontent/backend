@@ -33,6 +33,12 @@ const clientFormSchema = z.object({
   password: z.string().min(6, {
     message: "Senha deve ter pelo menos 6 caracteres.",
   }),
+  document: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
 })
 
 export default function NewUserPage() {
@@ -45,6 +51,12 @@ export default function NewUserPage() {
       email: "",
       slug: "",
       password: "",
+      document: "",
+      phone: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
     },
   })
 
@@ -59,6 +71,12 @@ export default function NewUserPage() {
         },
         body: JSON.stringify(values),
       })
+
+      if (res.status === 401) {
+        localStorage.removeItem("agency_admin_token")
+        window.location.href = "/master/login"
+        throw new Error("Sessão expirada")
+      }
 
       if (!res.ok) {
         const errorData = await res.json()
@@ -120,6 +138,36 @@ export default function NewUserPage() {
                                 </FormItem>
                             )}
                         />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                              control={form.control}
+                              name="document"
+                              render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>CPF / CNPJ</FormLabel>
+                                      <FormControl>
+                                          <Input placeholder="00.000.000/0000-00" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={form.control}
+                              name="phone"
+                              render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Telefone / WhatsApp</FormLabel>
+                                      <FormControl>
+                                          <Input placeholder="(00) 00000-0000" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                        </div>
+
                          <FormField
                             control={form.control}
                             name="email"
@@ -133,6 +181,65 @@ export default function NewUserPage() {
                                 </FormItem>
                             )}
                         />
+
+                        <div className="space-y-4 pt-2">
+                          <h3 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Endereço</h3>
+                          <FormField
+                              control={form.control}
+                              name="address"
+                              render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Logradouro</FormLabel>
+                                      <FormControl>
+                                          <Input placeholder="Rua Exemplo, 123" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                             <FormField
+                                control={form.control}
+                                name="city"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Cidade</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="São Paulo" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="state"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Estado</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="SP" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="zipCode"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>CEP</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="00000-000" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                          </div>
+                        </div>
+
                          <FormField
                             control={form.control}
                             name="password"

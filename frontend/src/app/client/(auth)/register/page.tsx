@@ -73,8 +73,8 @@ export default function RegisterPage() {
       // Redirecionar para o dashboard
       router.push("/")
       router.refresh()
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Erro ao cadastrar")
     }
   }
 

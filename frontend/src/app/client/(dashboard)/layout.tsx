@@ -15,8 +15,9 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { GradientCanvas } from "@/components/ui/gradient-canvas"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 
 export default function ClientLayout({
   children,
@@ -31,7 +32,10 @@ export default function ClientLayout({
     if (!token) {
       router.push("/login")
     } else {
-      setIsAuthorized(true)
+      // Use setTimeout to avoid synchronous state update warning
+      setTimeout(() => {
+        setIsAuthorized(true)
+      }, 0)
     }
   }, [router])
 
@@ -49,7 +53,7 @@ export default function ClientLayout({
   return (
     <SidebarProvider>
       <ClientSidebar />
-      <SidebarInset>
+      <SidebarInset className="">
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
@@ -69,8 +73,11 @@ export default function ClientLayout({
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          {children}
+        <div className="relative flex flex-1 flex-col gap-4 pt-0 overflow-hidden">
+          <GradientCanvas className="absolute inset-0 w-full h-full pointer-events-none" />
+          <div className="relative z-10 flex flex-1 flex-col gap-4">
+            {children}
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

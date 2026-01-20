@@ -3,3 +3,8 @@ node_modules
 .env
 
 /generated/prisma
+dist/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.DS_Store

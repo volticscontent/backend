@@ -1,6 +1,8 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -31,6 +33,12 @@ export default function UsersPage() {
           Authorization: `Bearer ${token}`,
         },
       })
+
+      if (res.status === 401) {
+        localStorage.removeItem("agency_admin_token")
+        window.location.href = "/master/login"
+        throw new Error("Sessão expirada")
+      }
 
       if (!res.ok) {
         throw new Error("Falha ao buscar usuários")
@@ -72,6 +80,7 @@ export default function UsersPage() {
                 <TableHead>Slug</TableHead>
                 <TableHead>Data Cadastro</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -87,6 +96,11 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">Ativo</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/master/users/${user.id}`}>Gerenciar</Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

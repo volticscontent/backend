@@ -4,6 +4,11 @@ import helmet from 'helmet';
 import masterRoutes from './routes/master.routes';
 import clientRoutes from './routes/client.routes';
 import authRoutes from './routes/auth.routes';
+import { marketingRoutes } from './routes/marketing.routes';
+import { trackingRoutes } from './routes/tracking.routes';
+import { cmsRoutes } from './routes/cms.routes';
+import { credentialRoutes } from './routes/credential.routes';
+import { seoRoutes } from './routes/seo.routes';
 
 const app = express();
 
@@ -18,6 +23,12 @@ app.get('/health', (req, res) => {
 
 // Rotas da API
 app.use('/api/auth', authRoutes);
+app.use('/api/marketing', marketingRoutes);
+app.use('/api/tracking', trackingRoutes);
+app.use('/api/cms', cmsRoutes);
+app.use('/api/credentials', credentialRoutes);
+app.use('/api/seo', seoRoutes);
+
 // 1. Prioridade: Rotas Master (/api/master)
 app.use('/api/master', masterRoutes);
 

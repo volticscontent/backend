@@ -7,9 +7,10 @@ export const config = {
      * 1. /api routes
      * 2. /_next (Next.js internals)
      * 3. /_static (inside /public)
-     * 4. all root files inside /public (e.g. /favicon.ico)
+     * 4. /logos (static images)
+     * 5. all root files inside /public (e.g. /favicon.ico)
      */
-    '/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)',
+    '/((?!api/|_next/|_static/|logos/|_vercel|[\\w-]+\\.\\w+).*)',
   ],
 };
 
@@ -18,7 +19,7 @@ export default async function middleware(req: NextRequest) {
   const hostname = req.headers.get('host')!;
 
   // Defina seu domínio base aqui (localhost para dev, agency.com para prod)
-  const allowedDomains = ['localhost:3000', 'agency.com'];
+  // const allowedDomains = ['localhost:3000', 'agency.com'];
   const isLocalhost = hostname.includes('localhost');
 
   // Lógica de extração de subdomínio
@@ -47,6 +48,11 @@ export default async function middleware(req: NextRequest) {
   }
 
   console.log(`Middleware: Host=${hostname}, Subdomain=${subdomain}, Path=${url.pathname}`);
+
+  // Permitir acesso à documentação globalmente (antes de qualquer reescrita)
+  if (url.pathname.startsWith('/docs')) {
+      return NextResponse.next();
+  }
 
   // 1. Reescrever rotas baseadas no subdomínio
   

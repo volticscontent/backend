@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useMutation } from "@tanstack/react-query"
-import { useRouter } from "next/navigation"
 
 const adminFormSchema = z.object({
   name: z.string().min(2, {
@@ -28,13 +27,15 @@ const adminFormSchema = z.object({
   password: z.string().min(6, {
     message: "Senha deve ter pelo menos 6 caracteres.",
   }),
-  role: z.string().default("COLABORADOR"),
+  role: z.string().min(1, {
+    message: "Selecione uma função.",
+  }),
 })
 
-export default function SettingsPage() {
-  const router = useRouter()
+type AdminFormValues = z.infer<typeof adminFormSchema>
 
-  const form = useForm<z.infer<typeof adminFormSchema>>({
+export default function SettingsPage() {
+  const form = useForm<AdminFormValues>({
     resolver: zodResolver(adminFormSchema),
     defaultValues: {
       name: "",
@@ -45,7 +46,7 @@ export default function SettingsPage() {
   })
 
   const mutation = useMutation({
-    mutationFn: async (values: z.infer<typeof adminFormSchema>) => {
+    mutationFn: async (values: AdminFormValues) => {
        const token = localStorage.getItem("agency_admin_token")
        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/master/admins`, {
         method: "POST",
@@ -55,6 +56,12 @@ export default function SettingsPage() {
         },
         body: JSON.stringify(values),
       })
+
+      if (res.status === 401) {
+        localStorage.removeItem("agency_admin_token")
+        window.location.href = "/master/login"
+        throw new Error("Sessão expirada")
+      }
 
       if (!res.ok) {
         const errorData = await res.json()
@@ -72,7 +79,7 @@ export default function SettingsPage() {
     }
   })
 
-  function onSubmit(values: z.infer<typeof adminFormSchema>) {
+  function onSubmit(values: AdminFormValues) {
     mutation.mutate(values)
   }
 

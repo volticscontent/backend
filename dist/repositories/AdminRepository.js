@@ -22,5 +22,24 @@ class AdminRepository {
             });
         });
     }
+    create(data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return prisma_1.default.admin.create({
+                data,
+            });
+        });
+    }
+    findAllPublic() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return prisma_1.default.admin.findMany({
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    role: true
+                }
+            });
+        });
+    }
 }
 exports.AdminRepository = AdminRepository;

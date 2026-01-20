@@ -64,8 +64,12 @@ export default function AdminLoginPage() {
       // Redirecionar para o dashboard master
       router.push("/")
       router.refresh()
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message)
+      } else {
+        setError("Ocorreu um erro desconhecido")
+      }
     }
   }
 

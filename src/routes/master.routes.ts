@@ -17,6 +17,10 @@ router.use(ensureAdmin); // Protect all master routes
 
 router.get('/dashboard', masterController.getDashboard);
 router.get('/users', masterController.getUsers);
+router.get('/users/:id', masterController.getUserDetails);
+router.post('/users/:userId/services', masterController.createService);
+router.put('/services/:id', masterController.updateService);
+router.get('/admins', masterController.getAdmins);
 router.post('/admins', masterController.createAdmin);
 router.post('/clients', masterController.createClient);
 

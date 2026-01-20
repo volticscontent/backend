@@ -31,6 +31,74 @@ class MasterController {
                 res.status(500).json({ error: 'Internal Server Error' });
             }
         });
+        this.getUserDetails = (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { id } = req.params;
+                if (typeof id !== 'string') {
+                    return res.status(400).json({ error: 'Invalid ID format' });
+                }
+                const data = yield this.masterService.getUserDetails(id);
+                if (!data)
+                    return res.status(404).json({ error: 'User not found' });
+                res.json(data);
+            }
+            catch (error) {
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        });
+        this.getAdmins = (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const data = yield this.masterService.getAllAdmins();
+                res.json(data);
+            }
+            catch (error) {
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        });
+        this.createService = (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { userId } = req.params;
+                if (typeof userId !== 'string') {
+                    return res.status(400).json({ error: 'Invalid User ID format' });
+                }
+                const service = yield this.masterService.createService(userId, req.body);
+                res.status(201).json(service);
+            }
+            catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
+        this.updateService = (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { id } = req.params;
+                if (typeof id !== 'string') {
+                    return res.status(400).json({ error: 'Invalid ID format' });
+                }
+                const service = yield this.masterService.updateService(id, req.body);
+                res.json(service);
+            }
+            catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
+        this.createAdmin = (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const admin = yield this.masterService.createAdmin(req.body);
+                res.status(201).json(admin);
+            }
+            catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
+        this.createClient = (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const client = yield this.masterService.createClient(req.body);
+                res.status(201).json(client);
+            }
+            catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
     }
 }
 exports.MasterController = MasterController;

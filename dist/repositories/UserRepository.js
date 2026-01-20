@@ -22,5 +22,26 @@ class UserRepository {
             });
         });
     }
+    findByEmail(email) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return prisma_1.default.user.findUnique({
+                where: { email },
+            });
+        });
+    }
+    findAll() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return prisma_1.default.user.findMany({
+                orderBy: { createdAt: 'desc' }
+            });
+        });
+    }
+    create(data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return prisma_1.default.user.create({
+                data,
+            });
+        });
+    }
 }
 exports.UserRepository = UserRepository;

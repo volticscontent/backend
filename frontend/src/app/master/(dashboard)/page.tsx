@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react"
 
 export default function MasterDashboard() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ name: string } | null>(null)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("agency_admin_user")
     if (storedUser && storedUser !== "undefined") {
       try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUser(JSON.parse(storedUser))
       } catch (e) {
         console.error("Erro ao fazer parse do usuário admin:", e)

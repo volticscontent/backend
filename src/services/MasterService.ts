@@ -2,6 +2,7 @@ import { IAdminRepository } from '../interfaces/IAdminRepository';
 import { IUserRepository } from '../interfaces/IUserRepository';
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 export class MasterService {
   constructor(
@@ -18,6 +19,53 @@ export class MasterService {
 
   async getUsersList() {
       return this.userRepository.findAll();
+  }
+
+  async getUserDetails(id: string) {
+    return prisma.user.findUnique({
+      where: { id },
+      include: {
+        services: {
+          include: {
+            collaborators: {
+              select: { id: true, name: true, role: true, email: true }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        }
+      }
+    });
+  }
+
+  async getAllAdmins() {
+    return prisma.admin.findMany({
+      select: { id: true, name: true, role: true, email: true }
+    });
+  }
+
+  async createService(userId: string, data: { title: string, sector?: string, description?: string }) {
+    return prisma.service.create({
+        data: {
+            title: data.title,
+            sector: data.sector,
+            description: data.description,
+            userId: userId,
+            status: 'ACTIVE'
+        }
+    });
+  }
+
+  async updateService(serviceId: string, data: { sector?: string, collaboratorIds?: string[], status?: any }) {
+    return prisma.service.update({
+      where: { id: serviceId },
+      data: {
+        sector: data.sector,
+        status: data.status,
+        collaborators: data.collaboratorIds ? {
+          set: data.collaboratorIds.map(id => ({ id }))
+        } : undefined
+      }
+    });
   }
 
   async createAdmin(data: Prisma.AdminCreateInput) {

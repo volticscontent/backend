@@ -29,9 +29,9 @@ export default function MasterLayout({
   useEffect(() => {
     const token = localStorage.getItem("agency_admin_token")
     if (!token) {
-      router.push("/login")
+      router.push("/master/login")
     } else {
-      setIsAuthorized(true)
+      setTimeout(() => setIsAuthorized(true), 0)
     }
   }, [router])
 

@@ -63,10 +63,10 @@ export default function LoginPage() {
       }
 
       // Redirecionar para o dashboard
-      router.push("/")
+      router.push("/client")
       router.refresh()
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Erro ao fazer login")
     }
   }
 

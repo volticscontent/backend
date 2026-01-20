@@ -2,27 +2,21 @@
 
 import * as React from "react"
 import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
   GalleryVerticalEnd,
-  Map,
   PieChart,
-  Settings2,
   SquareTerminal,
-  Users,
   LayoutDashboard,
   FileText,
-  Settings,
   LifeBuoy,
-  Send,
-  Database
+  Globe,
+  Box,
+  Megaphone,
+  Briefcase,
+  Settings,
+  type LucideIcon
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavUser } from "@/components/nav-user"
 import { TeamSwitcher } from "@/components/team-switcher"
 import {
@@ -33,18 +27,49 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-// Sample data for Client
-const data = {
+// Icon Map
+const iconMap: Record<string, LucideIcon> = {
+  LayoutDashboard,
+  SquareTerminal,
+  LifeBuoy,
+  PieChart,
+  Globe,
+  Box,
+  Megaphone,
+  Briefcase,
+  Settings,
+  FileText
+}
+
+interface NavItem {
+    title: string
+    url: string
+    icon?: LucideIcon
+    isActive?: boolean
+    items?: {
+        title: string
+        url: string
+    }[]
+}
+
+interface User {
+    name: string
+    email: string
+    avatar: string
+}
+
+// Initial Base Data (fallback)
+const initialData = {
   user: {
-    name: "Client User",
-    email: "client@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    name: "Carregando...",
+    email: "...",
+    avatar: "",
   },
   teams: [
     {
-      name: "My Business",
+      name: "Minha Empresa",
       logo: GalleryVerticalEnd,
-      plan: "Client",
+      plan: "Cliente",
     },
   ],
   navMain: [
@@ -98,16 +123,53 @@ const data = {
 }
 
 export function ClientSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [navItems, setNavItems] = React.useState<NavItem[]>(initialData.navMain)
+  const [user, setUser] = React.useState<User>(initialData.user)
+
+  React.useEffect(() => {
+    async function fetchSidebar() {
+        const storedUser = localStorage.getItem("agency_user")
+        const token = localStorage.getItem("agency_token")
+        
+        if (!storedUser || !token) return
+
+        const userData = JSON.parse(storedUser)
+        setUser({
+            name: userData.name,
+            email: userData.email,
+            avatar: "https://github.com/shadcn.png"
+        })
+
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/${userData.slug}/sidebar`, {
+                headers: { "Authorization": `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                // Map icon strings to components
+                const mappedData = data.map((item: NavItem & { icon: string }) => ({
+                    ...item,
+                    icon: iconMap[item.icon] || Box // Fallback icon
+                }))
+                setNavItems(mappedData)
+            }
+        } catch (error) {
+            console.error("Failed to fetch sidebar", error)
+        }
+    }
+    fetchSidebar()
+  }, [])
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={initialData.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

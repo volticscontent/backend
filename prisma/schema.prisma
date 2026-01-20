@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum AdminRole {
@@ -26,6 +25,7 @@ model Admin {
   updatedAt DateTime @updatedAt
   
   systemLogs System[]
+  services   Service[]
 
   @@map("admins")
 }
@@ -36,6 +36,17 @@ model User {
   email     String   @unique
   slug      String   @unique // Para acesso via URL: api.$[dominio]/$[slug.user]/...
   password  String
+  
+  // Detalhes do Cliente
+  document    String?  // CPF ou CNPJ
+  phone       String?
+  
+  // Endereço
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -44,8 +55,182 @@ model User {
   services       Service[]
   invoices       Invoice[]
   tickets        Ticket[]
+  marketing      MarketingSettings?
+  datasets       TrackingDataset[]
+  cmsTypes       CmsContentType[]
 
   @@map("users")
+}
+
+model MarketingSettings {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  
+  metaPixelId  String?
+  metaApiToken String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("marketing_settings")
+}
+
+model SeoSettings {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  
+  // Metatags Globais
+  globalTitle       String?
+  globalDescription String?
+  
+  // Integrações
+  googleSearchConsoleId String?
+  googleAnalyticsId     String?
+  
+  // Lista de Keywords (JSON array)
+  targetKeywords    Json?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("seo_settings")
+}
+
+model TrackingDataset {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  destinations TrackingDestination[]
+  sources      TrackingSource[]
+  events       TrackingEvent[]
+  deliveries   TrackingEventDelivery[] // Relação para fácil acesso, se necessário
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tracking_datasets")
+}
+
+model TrackingEvent {
+  id          String          @id @default(cuid())
+  datasetId   String
+  dataset     TrackingDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  
+  eventId     String?         // External ID (deduplication key)
+  eventName   String
+  eventData   Json?
+  
+  url         String?
+  userAgent   String?
+  ip          String?
+  
+  status      String          @default("PROCESSED") 
+  
+  deliveries  TrackingEventDelivery[]
+
+  createdAt   DateTime        @default(now())
+
+  @@index([datasetId])
+  @@index([eventId])
+  @@map("tracking_events")
+}
+
+model TrackingEventDelivery {
+  id              String              @id @default(cuid())
+  eventId         String
+  event           TrackingEvent       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  destinationId   String
+  destination     TrackingDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  
+  // Relação opcional com Dataset para facilitar queries agregadas, se necessário
+  datasetId       String?
+  dataset         TrackingDataset?    @relation(fields: [datasetId], references: [id])
+
+  status          String              // PENDING, SUCCESS, FAILED
+  responseCode    Int?
+  responseBody    String?             @db.Text
+  
+  attemptCount    Int                 @default(1)
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([eventId])
+  @@index([destinationId])
+  @@map("tracking_event_deliveries")
+}
+
+enum DestinationPlatform {
+  META
+  TIKTOK
+  GOOGLE_ADS
+}
+
+model TrackingDestination {
+  id          String              @id @default(cuid())
+  datasetId   String
+  dataset     TrackingDataset     @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  platform    DestinationPlatform
+  enabled     Boolean             @default(true)
+  
+  // Platform specific config stored in JSON
+  // Meta: { pixelId, apiToken }
+  // TikTok: { pixelId, accessToken }
+  // Google: { conversionId, label }
+  config      Json
+
+  deliveries  TrackingEventDelivery[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tracking_destinations")
+}
+
+enum SourceType {
+  WEBHOOK
+  PIXEL_SCRIPT
+  CRM
+  MANUAL
+}
+
+enum WebhookProvider {
+  STRIPE
+  SHOPIFY
+  HOTMART
+  CUSTOM
+}
+
+enum SourceStatus {
+  PENDING
+  ACTIVE
+  ERROR
+}
+
+model TrackingSource {
+  id          String          @id @default(cuid())
+  datasetId   String
+  dataset     TrackingDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  type        SourceType
+  provider    WebhookProvider? // If type == WEBHOOK
+  
+  name        String
+  enabled     Boolean         @default(true)
+  status      SourceStatus    @default(PENDING)
+
+  // Config (e.g. webhook secret, specific mapping rules)
+  config      Json?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tracking_sources")
 }
 
 model System {
@@ -118,9 +303,11 @@ model Service {
   title       String
   description String?
   status      ServiceStatus @default(ACTIVE)
+  sector      String?       // e.g. "Marketing", "Development"
   features    String[]
   userId      String
   user        User          @relation(fields: [userId], references: [id])
+  collaborators Admin[]     // Squad responsible for this service
   invoices    Invoice[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -156,4 +343,50 @@ model Ticket {
   updatedAt DateTime       @updatedAt
 
   @@map("tickets")
+}
+
+model CmsContentType {
+  id          String   @id @default(cuid())
+  name        String   // e.g. "Blog Post"
+  slug        String   // e.g. "blog-post"
+  description String?
+  
+  // Defines the schema structure (fields: text, image, etc.)
+  // Format: [{ "key": "title", "type": "text", "required": true }, ...]
+  fields      Json     
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  entries     CmsContentEntry[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, slug])
+  @@map("cms_content_types")
+}
+
+model CmsContentEntry {
+  id            String   @id @default(cuid())
+  
+  contentTypeId String
+  contentType   CmsContentType @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+  
+  // Actual content data matching the schema
+  // Format: { "title": "My Post", "body": "..." }
+  data          Json
+  
+  // Status: DRAFT, PUBLISHED, ARCHIVED
+  status        String   @default("DRAFT")
+  
+  // SEO / Access
+  slug          String?  // Custom slug for fetching content, e.g. "my-first-post"
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([contentTypeId])
+  @@unique([contentTypeId, slug])
+  @@map("cms_content_entries")
 }

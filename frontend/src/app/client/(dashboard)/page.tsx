@@ -6,14 +6,41 @@ import { Button } from "@/components/ui/button"
 import { FileText, LifeBuoy, CreditCard, Activity } from "lucide-react"
 import Link from "next/link"
 
+  interface DashboardUser {
+    slug: string
+    name: string
+    email: string
+  }
+
+  interface DashboardStats {
+    activeServices: number
+    pendingInvoicesAmount: number
+    openTickets: number
+  }
+
+  interface DashboardActivity {
+    description: string
+    date: string
+    amount?: number
+  }
+
+  interface DashboardResponse {
+    stats: DashboardStats
+    recentActivity: DashboardActivity[]
+  }
+
 export default function ClientDashboard() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<DashboardUser | null>(null)
+  const [data, setData] = useState<DashboardResponse | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const storedUser = localStorage.getItem("agency_user")
     if (storedUser && storedUser !== "undefined") {
       try {
-        setUser(JSON.parse(storedUser))
+        const parsedUser = JSON.parse(storedUser)
+        setUser(parsedUser)
+        fetchDashboardData(parsedUser.slug)
       } catch (e) {
         console.error("Erro ao fazer parse do usuário:", e)
         localStorage.removeItem("agency_user")
@@ -23,9 +50,32 @@ export default function ClientDashboard() {
     }
   }, [])
 
+  async function fetchDashboardData(slug: string) {
+    try {
+      const token = localStorage.getItem("agency_token");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/${slug}/dashboard`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      if (res.ok) {
+        const dashboardData = await res.json()
+        setData(dashboardData)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados do dashboard:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="p-8">Carregando painel...</div>
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-      <div className="flex items-center justify-between space-y-2">
+      <div className="flex items-center justify-between p-4 rounded-lg">
         <h2 className="text-3xl font-bold tracking-tight">Painel do Cliente</h2>
         <div className="flex items-center space-x-2">
             <Button asChild>
@@ -41,9 +91,9 @@ export default function ClientDashboard() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3</div>
+            <div className="text-2xl font-bold">{data?.stats?.activeServices || 0}</div>
             <p className="text-xs text-muted-foreground">
-              +1 no último mês
+              Serviços contratados
             </p>
           </CardContent>
         </Card>
@@ -53,9 +103,11 @@ export default function ClientDashboard() {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 1.250,00</div>
+            <div className="text-2xl font-bold">
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data?.stats?.pendingInvoicesAmount || 0)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Vence em 5 dias
+              Total a pagar
             </p>
           </CardContent>
         </Card>
@@ -65,9 +117,9 @@ export default function ClientDashboard() {
             <LifeBuoy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1</div>
+            <div className="text-2xl font-bold">{data?.stats?.openTickets || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Última atualização há 2h
+              Aguardando resposta
             </p>
           </CardContent>
         </Card>
@@ -77,7 +129,7 @@ export default function ClientDashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">0</div>
             <p className="text-xs text-muted-foreground">
               Novos disponíveis
             </p>
@@ -108,19 +160,25 @@ export default function ClientDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-                <div className="flex items-center">
+              {data?.recentActivity && data.recentActivity.length > 0 ? (
+                data.recentActivity.map((activity, index) => (
+                  <div key={index} className="flex items-center">
                     <div className="ml-4 space-y-1">
-                        <p className="text-sm font-medium leading-none">Fatura #1234 Paga</p>
-                        <p className="text-sm text-muted-foreground">Há 2 dias</p>
+                      <p className="text-sm font-medium leading-none">{activity.description}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(activity.date).toLocaleDateString('pt-BR')}
+                      </p>
                     </div>
-                    <div className="ml-auto font-medium">R$ 500,00</div>
-                </div>
-                 <div className="flex items-center">
-                    <div className="ml-4 space-y-1">
-                        <p className="text-sm font-medium leading-none">Novo Ticket Criado</p>
-                        <p className="text-sm text-muted-foreground">Há 5 horas</p>
-                    </div>
-                </div>
+                    {activity.amount && (
+                      <div className="ml-auto font-medium">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(activity.amount)}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">Nenhuma atividade recente.</p>
+              )}
             </div>
           </CardContent>
         </Card>
