@@ -18,7 +18,16 @@ import stripeGlobalRoutes from './routes/stripe-global.routes';
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://frontend-six-mu-79.vercel.app',
+    process.env.FRONTEND_URL || ''
+  ].filter(Boolean),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-client-slug']
+}));
 app.use(express.json());
 
 // Log incoming requests
@@ -50,7 +59,7 @@ app.use('/api/credentials', credentialRoutes);
 app.use('/api/seo', seoRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/stripe', stripeGlobalRoutes);
-app.use('/api', campaignRoutes); 
+app.use('/api', campaignRoutes);
 app.use('/api', checkoutRoutes);
 
 // 3. Fallback: Rotas de Cliente (/api/:clientSlug)
