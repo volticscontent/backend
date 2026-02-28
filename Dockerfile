@@ -25,4 +25,4 @@ COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3001
 
-CMD ["node", "dist/server.js"]
+CMD ["sh", "-c", "node dist/server.js || echo 'Crash ocorreu! Mantendo vivo por 30s...' && sleep 30"]
