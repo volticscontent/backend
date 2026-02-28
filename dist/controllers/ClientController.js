@@ -144,21 +144,19 @@ class ClientController {
         this.validateClientMiddleware = (req, res, next) => __awaiter(this, void 0, void 0, function* () {
             const { clientSlug } = req.params;
             console.log(`[validateClientMiddleware] Validating slug: "${clientSlug}" for path: ${req.path}`);
-            console.log(`[validateClientMiddleware] All params:`, req.params);
             if (!clientSlug || typeof clientSlug !== 'string') {
-                console.log(`[validateClientMiddleware] Invalid slug: ${clientSlug}`);
                 res.status(400).json({ error: 'Client slug not provided or invalid' });
                 return;
             }
             try {
                 const client = yield this.clientService.getClientBySlug(clientSlug);
-                console.log(`[validateClientMiddleware] Client found: ${client.id}`);
+                console.log(`[validateClientMiddleware] Client found: ${client.id} (slug: ${client.slug})`);
                 next();
             }
             catch (error) {
-                console.log(`[validateClientMiddleware] Error validating client: ${error.message}`);
+                console.log(`[validateClientMiddleware] Error validating client with slug "${clientSlug}": ${error.message}`);
                 if (error.message === 'Client not found') {
-                    res.status(404).json({ error: error.message });
+                    res.status(404).json({ error: `Client not found for slug: ${clientSlug}` });
                 }
                 else {
                     console.error(error);

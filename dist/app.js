@@ -25,6 +25,8 @@ app.use(express_1.default.json());
 // Log incoming requests
 app.use((req, res, next) => {
     console.log(`[Request] ${req.method} ${req.url}`);
+    console.log(`[Params]`, req.params);
+    console.log(`[Query]`, req.query);
     next();
 });
 // Rota de Health Check
@@ -34,7 +36,9 @@ app.get('/health', (req, res) => {
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
 });
-// Rotas da API
+// 1. Prioridade: Rotas Master (/api/master)
+app.use('/api/master', master_routes_1.default);
+// 2. Rotas Globais/Específicas (Não usam slug no path)
 app.use('/api/auth', auth_routes_1.default);
 app.use('/api/marketing', marketing_routes_1.marketingRoutes);
 app.use('/api/tracking', tracking_routes_1.trackingRoutes);
@@ -42,12 +46,10 @@ app.use('/api/cms', cms_routes_1.cmsRoutes);
 app.use('/api/credentials', credential_routes_1.credentialRoutes);
 app.use('/api/seo', seo_routes_1.seoRoutes);
 app.use('/api/forms', form_routes_1.formRoutes);
-app.use('/api', campaign_routes_1.campaignRoutes); // General API routes
-app.use('/api', checkout_routes_1.checkoutRoutes); // Checkout settings routes
-app.use('/api/stripe', stripe_global_routes_1.default); // Global routes (callback)
-// 1. Prioridade: Rotas Master (/api/master)
-app.use('/api/master', master_routes_1.default);
-// 2. Fallback: Rotas de Cliente (/api/:clientSlug)
+app.use('/api/stripe', stripe_global_routes_1.default);
+app.use('/api', campaign_routes_1.campaignRoutes);
+app.use('/api', checkout_routes_1.checkoutRoutes);
+// 3. Fallback: Rotas de Cliente (/api/:clientSlug)
 // Onde :clientSlug será o identificador do usuário/cliente
 app.use('/api/:clientSlug', client_routes_1.default);
 exports.default = app;
