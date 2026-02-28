@@ -24,8 +24,10 @@ model Admin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  systemLogs System[]
-  services   Service[]
+  systemLogs   System[]
+  services     Service[]
+  servicesHead Service[] @relation("ServiceHead")
+  modules      ServiceModule[] @relation("ModuleCollaborators")
 
   @@map("admins")
 }
@@ -40,6 +42,7 @@ model User {
   // Detalhes do Cliente
   document    String?  // CPF ou CNPJ
   phone       String?
+  plan        String?  // FREE, PRO, ENTERPRISE
   
   // Endereço
   address     String?
@@ -56,8 +59,19 @@ model User {
   invoices       Invoice[]
   tickets        Ticket[]
   marketing      MarketingSettings?
+  seo            SeoSettings?
   datasets       TrackingDataset[]
   cmsTypes       CmsContentType[]
+
+  dataSources    DataSource[]
+  products       Product[]
+  campaigns      Campaign[]
+  teamMembers    TeamMember[]
+  teams          Team[]
+  crmContacts    CrmContact[]
+  crmPipelines   CrmPipeline[]
+  crmDeals       CrmDeal[]
+  forms          Form[]
 
   @@map("users")
 }
@@ -67,10 +81,20 @@ model MarketingSettings {
   userId       String   @unique
   user         User     @relation(fields: [userId], references: [id])
   
-  metaPixelId  String?
-  metaApiToken String?
+  metaPixelId        String?
+  metaApiToken       String?
+  metaAdAccountId    String?
   
-  createdAt    DateTime @default(now())
+  tiktokPixelId      String?
+  tiktokAccessToken  String?
+  tiktokAdvertiserId String?
+  
+  googleConversionId    String?
+  googleConversionLabel String?
+  googleAccessToken     String?
+  googleCustomerId      String?
+  
+  createdAt          DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@map("marketing_settings")
@@ -305,14 +329,65 @@ model Service {
   status      ServiceStatus @default(ACTIVE)
   sector      String?       // e.g. "Marketing", "Development"
   features    String[]
+  
+  headId      String?
+  head        Admin?        @relation("ServiceHead", fields: [headId], references: [id])
+  
   userId      String
   user        User          @relation(fields: [userId], references: [id])
+  
   collaborators Admin[]     // Squad responsible for this service
+  
+  modules     ServiceModule[]
+  
   invoices    Invoice[]
+  
+  campaigns      Campaign[]
+  teamMembers    TeamMember[]
+  checkoutSettings CheckoutSettings?
+  checkoutTemplates CheckoutTemplate[]
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   @@map("services")
+}
+
+model CheckoutTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // EMBEDDED | ELEMENTS
+  isDefault   Boolean  @default(false)
+  
+  // Configuration
+  config      Json     // Stores visual settings (color, radius, etc.) and behavior options
+  
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("checkout_templates")
+}
+
+model ServiceModule {
+  id          String   @id @default(cuid())
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  
+  key         String   // e.g. "cms", "marketing"
+  name        String
+  description String?
+  status      ServiceStatus @default(ACTIVE)
+  
+  collaborators Admin[] @relation("ModuleCollaborators")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([serviceId, key])
+  @@map("service_modules")
 }
 
 model Invoice {
@@ -355,6 +430,9 @@ model CmsContentType {
   // Format: [{ "key": "title", "type": "text", "required": true }, ...]
   fields      Json     
   
+  // Mapping Resolver: 'products', 'blog', 'standard'
+  resolver    String?  @default("standard")
+  
   userId      String
   user        User     @relation(fields: [userId], references: [id])
   
@@ -389,4 +467,248 @@ model CmsContentEntry {
   @@index([contentTypeId])
   @@unique([contentTypeId, slug])
   @@map("cms_content_entries")
+}
+
+model DataSource {
+  id            String   @id @default(cuid())
+  name          String
+  type          String   // STRIPE, FORM, PRODUCT, CAMPAIGN, TRACKING, CMS
+  integrationId String?  // ID of the linked entity (formId, campaignId, etc.)
+  config        Json?
+  status        String   @default("ACTIVE")
+  
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  lastSyncedAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  checkoutSettings CheckoutSettings[]
+
+  @@index([userId, type])
+  @@index([integrationId])
+  @@map("data_sources")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal  @default(0) @db.Decimal(10, 2)
+  currency    String?
+  sku         String?
+  image       String?
+  source      String?
+  tags        String[]
+  variants    Json?
+  active      Boolean  @default(true)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("products")
+}
+
+model Form {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  schema      Json
+  redirectUrl String?
+  status      String   @default("ACTIVE")
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  submissions FormSubmission[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([id, userId])
+  @@map("forms")
+}
+
+model FormSubmission {
+  id        String   @id @default(cuid())
+  data      Json
+  ip        String?
+  userAgent String?
+  referer   String?
+  
+  formId    String
+  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+
+  @@map("form_submissions")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("ACTIVE")
+  
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id])
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("campaigns")
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  members     TeamMember[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      TeamRole @default(MEMBER)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  teams     Team[]
+  allowedServices Service[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("team_members")
+}
+
+model CrmContact {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  jobTitle  String?
+  company   String?
+  type      String   @default("LEAD")
+  source    String?
+  tags      String[]
+  customFields Json?
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  deals     CrmDeal[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("crm_contacts")
+}
+
+model CrmPipeline {
+  id        String   @id @default(cuid())
+  name      String
+  isDefault Boolean  @default(false)
+  stages    CrmStage[]
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  deals     CrmDeal[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("crm_pipelines")
+}
+
+model CrmStage {
+  id        String   @id @default(cuid())
+  name      String
+  color     String?
+  order     Int      @default(0)
+  
+  pipelineId String
+  pipeline   CrmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  
+  deals      CrmDeal[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("crm_stages")
+}
+
+model CrmDeal {
+  id          String   @id @default(cuid())
+  title       String
+  value       Decimal  @default(0) @db.Decimal(10, 2)
+  status      String   // OPEN, WON, LOST
+  
+  stageId     String
+  stage       CrmStage @relation(fields: [stageId], references: [id])
+  
+  contactId   String?
+  contact     CrmContact? @relation(fields: [contactId], references: [id])
+  
+  pipelineId  String
+  pipeline    CrmPipeline @relation(fields: [pipelineId], references: [id])
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("crm_deals")
+}
+
+model CheckoutSettings {
+  id        String   @id @default(cuid())
+  serviceId String   @unique
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Fonte de Dados (DataSource)
+  dataSourceId String?
+  dataSource   DataSource? @relation(fields: [dataSourceId], references: [id])
+
+  // Pixels
+  facebookPixelId String?
+  googlePixelId   String?
+  tiktokPixelId   String?
+
+  // Config
+  collectPhone    Boolean @default(true)
+  collectAddress  Boolean @default(true)
+  onePageCheckout Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("checkout_settings")
 }

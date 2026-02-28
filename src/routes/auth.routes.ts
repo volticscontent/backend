@@ -3,12 +3,14 @@ import { AuthController } from '../controllers/AuthController';
 import { AuthService } from '../services/AuthService';
 import { UserRepository } from '../repositories/UserRepository';
 import { AdminRepository } from '../repositories/AdminRepository';
+import { TeamMemberRepository } from '../repositories/TeamMemberRepository';
 
 const authRoutes = Router();
 
 const userRepository = new UserRepository();
 const adminRepository = new AdminRepository();
-const authService = new AuthService(userRepository, adminRepository);
+const teamMemberRepository = new TeamMemberRepository();
+const authService = new AuthService(userRepository, adminRepository, teamMemberRepository);
 const authController = new AuthController(authService);
 
 // Client Auth

@@ -5,6 +5,12 @@ import { ensureClient } from '../middlewares/authMiddleware';
 export const cmsRoutes = Router();
 const cmsController = new CmsController();
 
+// Log requests to CMS routes
+cmsRoutes.use((req, res, next) => {
+  console.log(`[CmsRoutes] ${req.method} ${req.url}`);
+  next();
+});
+
 // Public / SDK Routes
 cmsRoutes.get('/public/:clientSlug/:typeSlug', cmsController.getPublicContent);
 cmsRoutes.get('/public/:clientSlug/:typeSlug/:entrySlug', cmsController.getPublicContent);

@@ -74,14 +74,42 @@ export async function ensureClient(req: Request, res: Response, next: NextFuncti
           const secret = process.env.JWT_SECRET || 'default_secret';
           const decoded = jwt.verify(token, secret) as TokenPayload;
 
-          if (decoded.role !== 'CLIENT') {
+          const allowedClientRoles = ['CLIENT', 'OWNER', 'ADMIN', 'MEMBER'];
+          const allowedAdminRoles = ['MASTER', 'DEV', 'COLABORADOR'];
+
+          if (allowedClientRoles.includes(decoded.role || '')) {
+              // Verify if user still exists (in case of DB reset or deleted user)
+              const userExists = await prisma.user.findUnique({ where: { id: decoded.id } });
+              if (!userExists) {
+                return res.status(401).json({ error: 'User not found or deleted' });
+              }
+
+              (req as any).userId = decoded.id;
+              (req as any).userSlug = decoded.slug;
+              return next();
+          } else if (allowedAdminRoles.includes(decoded.role || '')) {
+              // Admin accessing client route
+              (req as any).adminId = decoded.id;
+              (req as any).adminRole = decoded.role;
+
+              // Try to set client context if provided
+              let targetSlug: string | undefined = req.params.clientSlug as string | undefined;
+              const headerSlug = req.headers['x-client-slug'];
+              if (!targetSlug && headerSlug) {
+                  targetSlug = Array.isArray(headerSlug) ? headerSlug[0] : headerSlug;
+              }
+
+              if (targetSlug) {
+                 const targetUser = await prisma.user.findUnique({ where: { slug: targetSlug } });
+                 if (targetUser) {
+                    (req as any).userId = targetUser.id;
+                    (req as any).userSlug = targetUser.slug;
+                 }
+              }
+              return next();
+          } else {
              return res.status(403).json({ error: 'Access denied. Client role required.' });
           }
-
-          (req as any).userId = decoded.id;
-          (req as any).userSlug = decoded.slug;
-
-          return next();
         } catch (err) {
           return res.status(401).json({ error: 'Invalid token' });
         }

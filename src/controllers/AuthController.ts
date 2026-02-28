@@ -6,12 +6,12 @@ export class AuthController {
 
   async registerClient(req: Request, res: Response) {
     try {
-      const { name, email, password, slug } = req.body;
+      const { name, email, password, slug, plan } = req.body;
       if (!name || !email || !password || !slug) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      const result = await this.authService.registerClient({ name, email, password, slug });
+      const result = await this.authService.registerClient({ name, email, password, slug, plan });
       return res.status(201).json(result);
     } catch (error: any) {
       return res.status(400).json({ error: error.message });

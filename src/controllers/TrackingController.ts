@@ -13,6 +13,7 @@ export class TrackingController {
       const datasets = await trackingService.getDatasets(userId);
       return res.json(datasets);
     } catch (error) {
+      console.error("Error fetching datasets:", error);
       return res.status(500).json({ error: "Failed to fetch datasets" });
     }
   }

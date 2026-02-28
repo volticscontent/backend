@@ -31,7 +31,7 @@ class ClientService {
     getDashboardData(slug) {
         return __awaiter(this, void 0, void 0, function* () {
             const user = yield this.getClientBySlug(slug);
-            const [activeServicesCount, pendingInvoicesSum, openTicketsCount, recentInvoices, recentTickets] = yield Promise.all([
+            const [activeServicesCount, pendingInvoicesSum, openTicketsCount, recentInvoices, recentTickets, cmsCollectionsCount, cmsEntriesCount, activeCampaignsCount, cmsTypes] = yield Promise.all([
                 prisma_1.default.service.count({
                     where: {
                         userId: user.id,
@@ -63,6 +63,25 @@ class ClientService {
                     where: { userId: user.id },
                     orderBy: { createdAt: 'desc' },
                     take: 3
+                }),
+                prisma_1.default.cmsContentType.count({
+                    where: { userId: user.id }
+                }),
+                prisma_1.default.cmsContentEntry.count({
+                    where: { contentType: { userId: user.id } }
+                }),
+                prisma_1.default.campaign.count({
+                    where: { userId: user.id, status: 'ACTIVE' }
+                }),
+                prisma_1.default.cmsContentType.findMany({
+                    where: { userId: user.id },
+                    select: {
+                        id: true,
+                        name: true,
+                        _count: {
+                            select: { entries: true }
+                        }
+                    }
                 })
             ]);
             // Combinar e ordenar atividades recentes (simplificado)
@@ -72,7 +91,7 @@ class ClientService {
                     id: inv.id,
                     description: `Fatura #${inv.id.slice(-4)} - ${inv.status}`,
                     date: inv.createdAt,
-                    amount: inv.amount
+                    amount: Number(inv.amount)
                 })),
                 ...recentTickets.map(ticket => ({
                     type: 'ticket',
@@ -90,8 +109,22 @@ class ClientService {
                 },
                 stats: {
                     activeServices: activeServicesCount,
-                    pendingInvoicesAmount: pendingInvoicesSum._sum.amount || 0,
-                    openTickets: openTicketsCount
+                    pendingInvoicesAmount: Number(pendingInvoicesSum._sum.amount || 0),
+                    openTickets: openTicketsCount,
+                    campaigns: {
+                        active: activeCampaignsCount,
+                        spend: 0, // Placeholder until external API integration
+                        clicks: 0 // Placeholder until external API integration
+                    },
+                    cms: {
+                        collections: cmsCollectionsCount,
+                        entries: cmsEntriesCount,
+                        types: cmsTypes.map(t => ({
+                            id: t.id,
+                            name: t.name,
+                            count: t._count.entries
+                        }))
+                    }
                 },
                 recentActivity
             };
@@ -102,7 +135,15 @@ class ClientService {
             const user = yield this.getClientBySlug(slug);
             const services = yield prisma_1.default.service.findMany({
                 where: { userId: user.id },
-                orderBy: { createdAt: 'desc' }
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    head: { select: { name: true, email: true, role: true } },
+                    modules: {
+                        include: {
+                            collaborators: { select: { name: true, email: true, role: true } }
+                        }
+                    }
+                }
             });
             return services;
         });
@@ -120,8 +161,47 @@ class ClientService {
             const user = yield this.getClientBySlug(slug);
             const services = yield prisma_1.default.service.findMany({
                 where: { userId: user.id, status: 'ACTIVE' },
-                select: { title: true, id: true }
+                select: {
+                    title: true,
+                    id: true,
+                    features: true,
+                    modules: {
+                        select: { key: true }
+                    }
+                }
             });
+            // 1. Gather all features from all active services
+            const allFeatures = new Set();
+            services.forEach(service => {
+                var _a, _b;
+                (_a = service.features) === null || _a === void 0 ? void 0 : _a.forEach(f => allFeatures.add(f));
+                (_b = service.modules) === null || _b === void 0 ? void 0 : _b.forEach(m => allFeatures.add(m.key));
+            });
+            // Helper to check global feature presence
+            const hasGlobalFeature = (key) => allFeatures.has(key);
+            // Resolver definitions (Key situational items)
+            const resolvers = [];
+            // Bases de Dados (DataSources)
+            // Activates if any data-generating feature is present
+            if (hasGlobalFeature('TRACKING') ||
+                hasGlobalFeature('CMS') ||
+                hasGlobalFeature('FORMS') ||
+                hasGlobalFeature('STRIPE') ||
+                hasGlobalFeature('CHECKOUT')) {
+                resolvers.push({
+                    title: "Bases de Dados",
+                    url: "/client/databases",
+                    icon: "Database",
+                });
+            }
+            // Produtos (Products)
+            if (hasGlobalFeature('PRODUCTS') || hasGlobalFeature('CHECKOUT') || hasGlobalFeature('ECOMMERCE')) {
+                resolvers.push({
+                    title: "Produtos",
+                    url: "/client/products",
+                    icon: "ShoppingBag",
+                });
+            }
             const baseMenu = [
                 {
                     title: "Meu Painel",
@@ -130,8 +210,10 @@ class ClientService {
                     items: [
                         { title: "Visão Geral", url: "/client" },
                         { title: "Relatórios", url: "/client/reports" },
+                        { title: "Minha Equipe", url: "/client/team" },
                     ],
                 },
+                ...resolvers,
                 {
                     title: "Serviços",
                     url: "/client/services",
@@ -139,14 +221,6 @@ class ClientService {
                     items: [
                         { title: "Meus Contratos", url: "/client/services" },
                         { title: "Faturas", url: "/client/invoices" },
-                    ],
-                },
-                {
-                    title: "CMS",
-                    url: "/client/cms",
-                    icon: "FileText",
-                    items: [
-                        { title: "Conteúdo", url: "/client/cms" },
                     ],
                 },
                 {
@@ -158,26 +232,79 @@ class ClientService {
                         { title: "Meus Tickets", url: "/client/support" },
                     ],
                 },
+                {
+                    title: "Configurações",
+                    url: "/client/settings",
+                    icon: "Settings",
+                    items: [
+                        { title: "Negócio", url: "/client/settings" },
+                        { title: "Equipe", url: "/client/team" },
+                    ],
+                },
             ];
             const customServiceMenus = services.map(service => {
                 const titleLower = service.title.toLowerCase();
+                const features = service.features || [];
+                const moduleKeys = service.modules ? service.modules.map(m => m.key) : [];
+                const hasFeature = (key) => features.includes(key) || moduleKeys.includes(key);
                 let items = [];
                 let icon = "Box";
-                if (titleLower.includes('marketing') || titleLower.includes('tráfego') || titleLower.includes('social')) {
-                    icon = "PieChart";
-                    items = [
-                        { title: "Bases de Dados", url: `/client/services/${service.id}/integrations` },
-                        { title: "Campanhas", url: `/client/services/${service.id}/campaigns` },
-                    ];
-                }
-                else if (titleLower.includes('web') || titleLower.includes('site') || titleLower.includes('seo')) {
-                    icon = "Globe";
-                    items = [
-                        { title: "SEO & Visibilidade", url: `/client/services/${service.id}/seo` },
-                        { title: "CMS / Conteúdo", url: `/client/services/${service.id}/cms` },
-                    ];
+                // Feature flags constants
+                const HAS_TRACKING = hasFeature('TRACKING');
+                const HAS_CAMPAIGNS = hasFeature('CAMPAIGNS') || hasFeature('Gestão de Ads');
+                // Helper to check if title implies Web Dev (where SEO might be redundant if not primary)
+                const isWebDev = titleLower.includes('web') || titleLower.includes('desenvolvimento') || titleLower.includes('site');
+                const isSEO = titleLower.includes('seo') || titleLower.includes('otimização');
+                // SEO trigger refined: Show if feature is present
+                const HAS_SEO = hasFeature('SEO') || hasFeature('Análise de keywords') || isSEO;
+                const HAS_CMS = hasFeature('CMS');
+                const HAS_FORMS = hasFeature('FORMS');
+                const HAS_CHECKOUT = hasFeature('CHECKOUT');
+                const hasAnyFeature = HAS_TRACKING || HAS_CAMPAIGNS || HAS_SEO || HAS_CMS || HAS_FORMS || HAS_CHECKOUT;
+                if (hasAnyFeature) {
+                    // Explicit mode: use features to build menu
+                    if (HAS_TRACKING)
+                        items.push({ title: "Bases de Dados", url: `/client/services/${service.id}/integrations` });
+                    if (HAS_CAMPAIGNS)
+                        items.push({ title: "Campanhas", url: `/client/services/${service.id}/campaigns` });
+                    if (HAS_SEO)
+                        items.push({ title: "SEO & Visibilidade", url: `/client/services/${service.id}/seo` });
+                    if (HAS_CMS)
+                        items.push({ title: "Conteúdo (CMS)", url: `/client/services/${service.id}/cms` });
+                    if (HAS_FORMS)
+                        items.push({ title: "Formulários", url: `/client/services/${service.id}/web-dev/forms` });
+                    if (HAS_CHECKOUT)
+                        items.push({ title: "Checkout", url: `/client/services/${service.id}/web-dev/checkout` });
+                    // Set Icon based on dominance
+                    if (HAS_CAMPAIGNS) {
+                        if (titleLower.includes('social') || titleLower.includes('instagram') || titleLower.includes('facebook'))
+                            icon = "Megaphone";
+                        else if (titleLower.includes('ads') || titleLower.includes('tráfego') || titleLower.includes('google'))
+                            icon = "TrendingUp";
+                        else
+                            icon = "BarChart3";
+                    }
+                    else if (HAS_CMS) {
+                        if (titleLower.includes('blog'))
+                            icon = "PenTool";
+                        else
+                            icon = "Monitor";
+                    }
+                    else if (HAS_FORMS)
+                        icon = "ClipboardList";
+                    else if (HAS_CHECKOUT)
+                        icon = "CreditCard";
+                    else if (HAS_TRACKING)
+                        icon = "Database";
+                    else if (HAS_SEO)
+                        icon = "Search";
+                    else if (hasAnyFeature)
+                        icon = "Layers";
                 }
                 else {
+                    // No features configured — show only base items.
+                    // Admin should configure features/modules for proper menu visibility.
+                    icon = "Box";
                     items = [
                         { title: "Configurações", url: `/client/services/${service.id}/settings` }
                     ];
@@ -197,7 +324,18 @@ class ClientService {
         return __awaiter(this, void 0, void 0, function* () {
             const user = yield this.getClientBySlug(slug);
             const [services, tickets, invoices] = yield Promise.all([
-                prisma_1.default.service.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'desc' } }),
+                prisma_1.default.service.findMany({
+                    where: { userId: user.id },
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        head: { select: { name: true, email: true, role: true } },
+                        modules: {
+                            include: {
+                                collaborators: { select: { name: true, email: true, role: true } }
+                            }
+                        }
+                    }
+                }),
                 prisma_1.default.ticket.findMany({
                     where: { userId: user.id },
                     orderBy: { createdAt: 'desc' },

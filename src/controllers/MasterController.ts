@@ -9,6 +9,7 @@ export class MasterController {
           const data = await this.masterService.getDashboardData();
           res.json(data);
       } catch (error) {
+          console.error('[MasterController] getDashboard Error:', error);
           res.status(500).json({ error: 'Internal Server Error' });
       }
   }
@@ -18,6 +19,7 @@ export class MasterController {
           const data = await this.masterService.getUsersList();
           res.json(data);
       } catch (error) {
+          console.error('[MasterController] getUsers Error:', error);
           res.status(500).json({ error: 'Internal Server Error' });
       }
   }
@@ -32,6 +34,7 @@ export class MasterController {
           if (!data) return res.status(404).json({ error: 'User not found' });
           res.json(data);
       } catch (error) {
+          console.error('[MasterController] getUserDetails Error:', error);
           res.status(500).json({ error: 'Internal Server Error' });
       }
   }
@@ -58,6 +61,19 @@ export class MasterController {
       }
   }
 
+  deleteService = async (req: Request, res: Response) => {
+      try {
+          const { id } = req.params;
+          if (typeof id !== 'string') {
+              return res.status(400).json({ error: 'Invalid ID format' });
+          }
+          await this.masterService.deleteService(id);
+          res.status(204).send();
+      } catch (error) {
+          res.status(400).json({ error: (error as Error).message });
+      }
+  }
+
   updateService = async (req: Request, res: Response) => {
       try {
           const { id } = req.params;
@@ -67,6 +83,7 @@ export class MasterController {
           const service = await this.masterService.updateService(id, req.body);
           res.json(service);
       } catch (error) {
+          console.error('[MasterController] Update Error:', error);
           res.status(400).json({ error: (error as Error).message });
       }
   }

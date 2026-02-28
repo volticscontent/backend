@@ -19,6 +19,7 @@ class MasterController {
                 res.json(data);
             }
             catch (error) {
+                console.error('[MasterController] getDashboard Error:', error);
                 res.status(500).json({ error: 'Internal Server Error' });
             }
         });
@@ -28,6 +29,7 @@ class MasterController {
                 res.json(data);
             }
             catch (error) {
+                console.error('[MasterController] getUsers Error:', error);
                 res.status(500).json({ error: 'Internal Server Error' });
             }
         });
@@ -43,6 +45,7 @@ class MasterController {
                 res.json(data);
             }
             catch (error) {
+                console.error('[MasterController] getUserDetails Error:', error);
                 res.status(500).json({ error: 'Internal Server Error' });
             }
         });
@@ -68,6 +71,19 @@ class MasterController {
                 res.status(400).json({ error: error.message });
             }
         });
+        this.deleteService = (req, res) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { id } = req.params;
+                if (typeof id !== 'string') {
+                    return res.status(400).json({ error: 'Invalid ID format' });
+                }
+                yield this.masterService.deleteService(id);
+                res.status(204).send();
+            }
+            catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
         this.updateService = (req, res) => __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = req.params;
@@ -78,6 +94,7 @@ class MasterController {
                 res.json(service);
             }
             catch (error) {
+                console.error('[MasterController] Update Error:', error);
                 res.status(400).json({ error: error.message });
             }
         });

@@ -1,18 +1,24 @@
 import prisma from "../lib/prisma";
 import { DestinationPlatform, SourceType, WebhookProvider } from "@prisma/client";
 import { createHash } from "crypto";
+import { DataSourceService } from "./DataSourceService";
 
 export class TrackingService {
+  private dataSourceService = new DataSourceService();
   
   // Dataset Management
   async createDataset(userId: string, name: string, description?: string) {
-    return prisma.trackingDataset.create({
+    const dataset = await prisma.trackingDataset.create({
       data: {
         userId,
         name,
         description
       }
     });
+
+    await this.ensureTrackingDataSource(userId, dataset.id, dataset.name);
+
+    return dataset;
   }
 
   async getDatasets(userId: string) {
@@ -40,16 +46,56 @@ export class TrackingService {
   }
 
   async updateDataset(userId: string, datasetId: string, data: { name?: string, description?: string }) {
-    return prisma.trackingDataset.update({
+    const updated = await prisma.trackingDataset.update({
       where: { id: datasetId, userId },
       data
     });
+
+    if (data.name) {
+        const dataSource = await prisma.dataSource.findFirst({
+            where: { userId, type: 'TRACKING', integrationId: datasetId }
+        });
+        if (dataSource) {
+            await prisma.dataSource.update({
+                where: { id: dataSource.id },
+                data: { name: `Tracking: ${data.name}` }
+            });
+        }
+    }
+
+    return updated;
   }
 
   async deleteDataset(userId: string, datasetId: string) {
-    return prisma.trackingDataset.delete({
+    const deleted = await prisma.trackingDataset.delete({
       where: { id: datasetId, userId }
     });
+
+    await prisma.dataSource.deleteMany({
+        where: { userId, type: 'TRACKING', integrationId: datasetId }
+    });
+
+    return deleted;
+  }
+
+  private async ensureTrackingDataSource(userId: string, datasetId: string, name: string) {
+    const existing = await prisma.dataSource.findFirst({
+        where: {
+            userId,
+            type: 'TRACKING',
+            integrationId: datasetId
+        }
+    });
+
+    if (!existing) {
+        await this.dataSourceService.createDataSource(userId, {
+            name: `Tracking: ${name}`,
+            type: 'TRACKING',
+            integrationId: datasetId,
+            status: 'ACTIVE',
+            config: { datasetId }
+        });
+    }
   }
 
   async getEvents(userId: string, datasetId: string, page = 1, limit = 50) {
@@ -272,8 +318,11 @@ export class TrackingService {
 
         if (destination.platform === 'META') {
             result = await this.sendToMetaCAPI(destination.config, event);
+        } else if (destination.platform === 'TIKTOK') {
+            result = await this.sendToTikTokCAPI(destination.config, event);
+        } else if (destination.platform === 'GOOGLE_ADS') {
+            result = await this.sendToGoogleAds(destination.config, event);
         }
-        // Add other platforms here
 
         // Update delivery status
         await prisma.trackingEventDelivery.update({
@@ -369,6 +418,79 @@ export class TrackingService {
       }
   }
 
+  async sendToTikTokCAPI(config: any, event: any): Promise<{success: boolean, code: number, body: string}> {
+    if (!config.pixelId || !config.accessToken) {
+        return { success: false, code: 400, body: 'Missing TikTok Pixel ID or Access Token' };
+    }
+
+    // TikTok Events API
+    // https://ads.tiktok.com/marketing_api/docs?id=1701890979375106
+
+    const payload = {
+        pixel_code: config.pixelId,
+        event: event.eventName, // TikTok uses specific standard events, mapping might be needed
+        event_id: event.eventId,
+        timestamp: new Date().toISOString(),
+        context: {
+            page: {
+                url: event.url
+            },
+            user_agent: event.userAgent,
+            ip: event.clientIp
+        },
+        properties: {
+            ...event.eventData,
+            value: event.eventData.value,
+            currency: event.eventData.currency || 'BRL'
+        }
+    };
+
+    // User Data (hashed)
+    // TikTok expects emails/phones to be hashed SHA256
+    const user: any = {};
+    if (event.eventData.email) user.email = this.hashData(event.eventData.email);
+    if (event.eventData.phone) user.phone_number = this.hashData(event.eventData.phone);
+    if (event.eventData.externalId) user.external_id = this.hashData(event.eventData.externalId);
+    
+    // @ts-ignore
+    if (Object.keys(user).length > 0) payload.user = user;
+
+    try {
+        const response = await fetch('https://business-api.tiktok.com/open_api/v1.3/event/track/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Token': config.accessToken
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        const body = JSON.stringify(data);
+
+        if (data.code !== 0) { // TikTok uses code 0 for success
+             console.error('[TikTok CAPI] Error:', body);
+             return { success: false, code: 400, body };
+        }
+
+        console.log(`[TikTok CAPI] Success: ${event.eventName} sent to Pixel ${config.pixelId}`);
+        return { success: true, code: 200, body };
+
+    } catch (error: any) {
+        console.error('[TikTok CAPI] Network Error:', error);
+        return { success: false, code: 0, body: error.message };
+    }
+  }
+
+  async sendToGoogleAds(config: any, event: any): Promise<{success: boolean, code: number, body: string}> {
+      // Google Ads Offline Conversions via REST is complex (requires OAuth/gRPC)
+      // For MVP/UTMify copy, we usually use Measurement Protocol or just log that it requires advanced setup
+      
+      // Placeholder for now as it requires Google Ads Customer ID + OAuth Refresh Token flow
+      console.log('[Google Ads] Implementation pending OAuth setup');
+      return { success: false, code: 501, body: 'Not Implemented: Google Ads requires OAuth Flow' };
+  }
+
   // Source Management
   async addSource(
     userId: string,
@@ -376,12 +498,13 @@ export class TrackingService {
     type: SourceType,
     name: string,
     provider?: WebhookProvider,
-    config?: any
+    config?: any,
+    createDataSource: boolean = true
   ) {
     const dataset = await this.getDatasetById(userId, datasetId);
     if (!dataset) throw new Error("Dataset not found");
 
-    return prisma.trackingSource.create({
+    const source = await prisma.trackingSource.create({
       data: {
         datasetId,
         type,
@@ -391,6 +514,33 @@ export class TrackingService {
         enabled: true
       }
     });
+
+    // Auto-link to Unified DataSource if requested
+    if (createDataSource) {
+        let dataSourceType = 'TRACKING';
+        if (type === 'WEBHOOK' && provider === 'STRIPE') {
+            dataSourceType = 'STRIPE';
+        }
+
+        try {
+            await this.dataSourceService.createDataSource(userId, {
+                name: `[Tracking] ${name}`,
+                type: dataSourceType,
+                integrationId: source.id,
+                config: {
+                    trackingSourceId: source.id,
+                    datasetId: datasetId,
+                    provider: provider,
+                    originalConfig: config
+                },
+                status: 'ACTIVE'
+            });
+        } catch (error) {
+            console.error("Failed to auto-create DataSource:", error);
+        }
+    }
+
+    return source;
   }
 
   async updateSource(

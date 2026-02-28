@@ -11,6 +11,7 @@ export class CmsController {
       const type = await cmsService.createContentType(userId, req.body);
       return res.json(type);
     } catch (error: any) {
+      console.error("Error creating content type:", error);
       return res.status(400).json({ error: error.message });
     }
   }

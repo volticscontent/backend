@@ -137,18 +137,22 @@ getInvoices = async (req: Request, res: Response): Promise<void> => {
   }
 
   validateClientMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-      const { clientSlug } = req.params;
-      if (!clientSlug || typeof clientSlug !== 'string') {
-        res.status(400).json({ error: 'Client slug not provided or invalid' });
-        return;
-      }
+    const { clientSlug } = req.params;
+    console.log(`[validateClientMiddleware] Validating slug: "${clientSlug}" for path: ${req.path}`);
+    
+    if (!clientSlug || typeof clientSlug !== 'string') {
+      res.status(400).json({ error: 'Client slug not provided or invalid' });
+      return;
+    }
 
       try {
-        await this.clientService.getClientBySlug(clientSlug);
+        const client = await this.clientService.getClientBySlug(clientSlug);
+        console.log(`[validateClientMiddleware] Client found: ${client.id} (slug: ${client.slug})`);
         next();
       } catch (error: any) {
+         console.log(`[validateClientMiddleware] Error validating client with slug "${clientSlug}": ${error.message}`);
          if (error.message === 'Client not found') {
-            res.status(404).json({ error: error.message });
+            res.status(404).json({ error: `Client not found for slug: ${clientSlug}` });
          } else {
             console.error(error);
             res.status(500).json({ error: 'Internal server error checking client' });
